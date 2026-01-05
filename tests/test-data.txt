@@ -1,0 +1,5 @@
+This is a simple test file for the TAKC system.
+It contains basic information about financial performance.
+Total revenue was $125 million in Q4 2024.
+Net profit margins improved to 18.5%.
+Product sales were $85 million.

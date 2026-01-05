@@ -1,0 +1,12 @@
+{
+  "aws_region": "us-east-1",
+  "environment": "dev",
+  "project_name": "TAKC",
+  "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
+  "lambda_timeout_data_processor": 5,
+  "lambda_timeout_query_processor": 60,
+  "lambda_memory_data_processor": 512,
+  "lambda_memory_query_processor": 256,
+  "redis_node_type": "cache.t3.micro",
+  "enable_monitoring": true
+}
