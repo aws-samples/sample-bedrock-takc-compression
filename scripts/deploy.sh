@@ -64,13 +64,6 @@ check_prerequisites() {
 install_dependencies() {
     log_info "Installing Python dependencies..."
     
-    cd "$PROJECT_ROOT"
-    
-    # Install project dependencies
-    if [ -f "requirements.txt" ]; then
-        pip3 install -q -r requirements.txt
-    fi
-    
     # Install CDK dependencies
     cd "$CDK_DIR"
     if [ ! -d ".venv" ]; then
