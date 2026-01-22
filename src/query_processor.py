@@ -238,46 +238,62 @@ def _retrieve_compressed_cache(task_type: str, compression_rate: str) -> Optiona
 
 def _generate_response(query: str, compressed_cache: Dict[str, Any], 
                      compression_rate: str, task_type: str) -> str:
-    """Generate response based on compressed context and query"""
+    """Generate response using Bedrock with compressed context"""
     
     # Get compressed context
     compressed_context = compressed_cache.get('compressed_kv', '')
-    original_context = compressed_cache.get('original_context', '')
+    if not compressed_context:
+        compressed_context = compressed_cache.get('compressed_context', '')
     
-    # Use original context if available, otherwise use compressed
-    context_to_search = original_context if original_context else compressed_context
+    # Construct prompt for Bedrock
+    prompt = f"""You are an AI assistant with access to compressed knowledge about {task_type}.
+
+Compressed Knowledge:
+{compressed_context}
+
+User Query: {query}
+
+Instructions:
+1. Answer the query using ONLY the information from the compressed knowledge above
+2. Be concise and specific
+3. If the information is not in the compressed knowledge, say "I don't have that information in the provided context"
+4. Do not make up information
+
+Answer:"""
     
-    # Financial analysis responses
-    if task_type == 'financial-analysis':
-        if 'revenue' in query.lower():
-            # Extract revenue information from context
-            revenue_match = re.search(r'revenue.*?\$?(\d+)\s*m', context_to_search, re.IGNORECASE)
-            if revenue_match:
-                amount = revenue_match.group(1)
-                return f"Based on the financial data (using {compression_rate} compression), the Q1 2024 revenue was ${amount}M, up 15% year-over-year."
-            return f"Based on the financial data (using {compression_rate} compression), the Q1 2024 revenue was $125M, up 15% year-over-year."
+    try:
+        # Call Bedrock for inference
+        bedrock_runtime = boto3.client('bedrock-runtime')
+        model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
         
-        elif 'profit' in query.lower() or 'margin' in query.lower():
-            # Extract profit/margin information
-            margin_match = re.search(r'margin.*?(\d+)%', context_to_search, re.IGNORECASE)
-            if margin_match:
-                margin = margin_match.group(1)
-                return f"The gross margins improved to {margin}% in Q1 2024."
-            return "The gross margins improved to 68% in Q1 2024."
+        response = bedrock_runtime.invoke_model(
+            modelId=model_id,
+            body=json.dumps({
+                'anthropic_version': 'bedrock-2023-05-31',
+                'messages': [{
+                    'role': 'user',
+                    'content': prompt
+                }],
+                'max_tokens': 500,
+                'temperature': 0.7
+            })
+        )
         
-        elif 'expense' in query.lower():
-            expense_match = re.search(r'expense.*?\$?(\d+)\s*m', context_to_search, re.IGNORECASE)
-            if expense_match:
-                amount = expense_match.group(1)
-                return f"Operating expenses were ${amount}M in Q1 2024."
-            return "Operating expenses were $85M in Q1 2024."
+        result = json.loads(response['body'].read())
+        answer = result['content'][0]['text']
         
-        else:
-            # For other queries, provide summary from context
-            return f"Based on {compression_rate} compression of financial data: Q1 2024 showed strong performance with revenue of $125M (up 15% YoY), operating expenses of $85M, and net income of $40M. Key highlights include launching a new product line, expanding to 3 new markets, and 25% customer base growth."
-    
-    # Generic response for other task types
-    return f"[Using {compression_rate} compression] Based on the compressed knowledge for {task_type}: {context_to_search[:300]}..."
+        logger.info("Bedrock response generated", extra={
+            "query": query,
+            "compression_rate": compression_rate,
+            "model_id": model_id
+        })
+        
+        return answer
+        
+    except Exception as e:
+        logger.error("Bedrock invocation failed", extra={"error": str(e)})
+        # Fallback to simple context return
+        return f"[Using {compression_rate} compression] Based on the compressed knowledge: {compressed_context[:300]}..."
 
 
 if __name__ == '__main__':
